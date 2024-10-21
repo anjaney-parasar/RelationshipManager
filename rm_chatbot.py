@@ -3,7 +3,7 @@ import os
 import sqlite3
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage, HumanMessage, RemoveMessage
+from langchain_core.messages import SystemMessage, HumanMessage, RemoveMessage, AIMessage
 from langgraph.graph import END, MessagesState
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -60,7 +60,7 @@ def call_model(state: State):
         )
         chain = prompt | model | StrOutputParser()
         response = chain.invoke({"messages": messages, "prev_chat_history_summary": prev_chat_history_summary})
-        state['messages']=response
+        state['messages']=AIMessage(content=response)
     return state
 
 def summarize_conversation(state: State):
@@ -82,7 +82,7 @@ def summarize_conversation(state: State):
     return state
 
 def should_continue(state: State):
-    if len(state["messages"]) > 6:
+    if len(state["messages"]) > 4:
         return "summariser"
     return END
 
@@ -131,30 +131,30 @@ if __name__=="__main__":
     """  
     
     
-    # input_message = HumanMessage(content="Which area would be the best though?")
-    # output = graph.invoke({"prev_chat_history":previous_chat_history ,"messages": [input_message]}, config)  ###Three inputs required
-    # for m in output['messages'][-1:]:
-    #     m.pretty_print()
+    input_message = HumanMessage(content="Which area would be the best though?")
+    output = graph.invoke({"prev_chat_history":previous_chat_history ,"messages": [input_message]}, config)  ###Three inputs required
+    for m in output['messages'][-1:]:
+        m.pretty_print()
 
-    # input_message = HumanMessage(content="what's my name?")
-    # output = graph.invoke({"messages": [input_message]}, config)
-    # for m in output['messages'][-1:]:
-    #     m.pretty_print()
+    input_message = HumanMessage(content="what's my name?")
+    output = graph.invoke({"messages": [input_message]}, config)
+    for m in output['messages'][-1:]:
+        m.pretty_print()
 
-    # input_message = HumanMessage(content="i like the 49ers!")
-    # output = graph.invoke({"messages": [input_message]}, config)
-    # for m in output['messages'][-1:]:
-    #     m.pretty_print()
+    input_message = HumanMessage(content="i like the 49ers!")
+    output = graph.invoke({"messages": [input_message]}, config)
+    for m in output['messages'][-1:]:
+        m.pretty_print()
 
         
     """Let's confirm that our state is saved locally."""
-
+"""
     input_message = HumanMessage(content="i like the 49ers!")
     output = graph.invoke({"prev_chat_history":previous_chat_history ,"messages": [input_message]}, config)
 
     from pprint import pprint
     pprint(output)
-
+"""
     # API
     # request/ input= thread_id, message, previous_chat_history
     # output = AI message , summary

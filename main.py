@@ -17,9 +17,11 @@ class ChatMessage(BaseModel):
     session_id: str
     user_input: str
 
+
 class ChatResponse(BaseModel):
     session_id: str
     message: str
+    current_summary: Optional[str]
 
 @app.post("/initialize_session", response_model=dict)
 async def initialize_session(request: InitializeSession):
@@ -32,12 +34,13 @@ async def initialize_session(request: InitializeSession):
         "messages": []
     }, config)
 
-    print(output)
+  
     
     # Store the session state
     sessions[session_id] = {
         "prev_chat_history_summary": output.get("prev_chat_history_summary", ""),
-        "messages": []
+        "messages": [],
+        "current_summary":""
     }
     
     return {"session_id": session_id}
@@ -59,20 +62,26 @@ async def chat(request: ChatMessage):
     }, config)
     
     ai_message = output['messages'][-1]
+    
     session["messages"].append(ai_message)
+    summary=output.get("summary","")
+    session['current_summary']=summary
     
     # Update session state if summarized
     if "summary" in output:
         session["messages"] = output["messages"]
     
-    return ChatResponse(session_id=request.session_id, message=ai_message.content)
+    return ChatResponse(session_id=request.session_id, message=ai_message.content,current_summary=summary)
 
 @app.get("/session/{session_id}")
 async def get_session(session_id: str):
     if session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
-    return {"session_id": session_id, "history": sessions[session_id]["messages"],"prev_chat_history_summary":sessions[session_id]["prev_chat_history_summary"] }
+    return {"session_id": session_id, 
+            "history": sessions[session_id]["messages"],
+            "prev_chat_history_summary":sessions[session_id]["prev_chat_history_summary"],
+            "current_summary":sessions[session_id]["current_summary"] }
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, port=8080)
+    uvicorn.run(app, port=8080, reload=True)
