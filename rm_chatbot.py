@@ -11,8 +11,7 @@ from langgraph.graph import StateGraph, START
 from pprint import pprint
 
 # Database setup
-db_path = "state_db/example.db"
-conn = sqlite3.connect(db_path, check_same_thread=False)
+conn = sqlite3.connect(":memory:", check_same_thread = False)
 memory = SqliteSaver(conn)
 
 model = ChatOpenAI(model="gpt-4")
@@ -21,6 +20,7 @@ class State(MessagesState):
     prev_chat_history_summary: str
     prev_chat_history:list[dict]
     summary: str
+    agent_prompt:str
 
 def prev_chat_summariser(state: State):
     prev_chat_history = state.get("prev_chat_history", "")
@@ -37,29 +37,22 @@ def call_model(state: State):
     prev_chat_history_summary = state.get("prev_chat_history_summary", "")
 
     messages = state["messages"]
+    agent_prompt=state.get('agent_prompt')
     
     if messages:
-
-        prompt = ChatPromptTemplate.from_template(
-            """Travel Dreams Agency specializes in luxury travel experiences.
-            We offer customized itineraries, group tours, and cruise packages.
-            Our working hours are 9 AM to 5 PM EST, Monday to Friday.
-            For urgent matters outside business hours, please email emergency@traveldreams.com.
-
-            Frequently Asked Questions:
-            1. How do I book a trip? Visit our website or call us at 1-800-TRAVEL-DREAMS.
-            2. What's your cancellation policy? Full refund if cancelled 30 days before the trip.
-            3. Do you offer travel insurance? Yes, we partner with TravelSafe Insurance.
-
-            You are a helpful AI assistant for Travel Dreams Agency who responds to user messages when the human agent is unavailable.
-            Use the previous chat history between human agent and customer and above information to respond to customer queries
-            Previous chat history between human agent and customer: {prev_chat_history_summary}
+        additional_instructions="""Previous chat history between human agent and customer: {prev_chat_history_summary}
             The conversation till now: {messages}
             Your response:
             """
+        final_prompt=agent_prompt+additional_instructions
+        # print("Final prompt looks like",final_prompt)
+        prompt = ChatPromptTemplate.from_template(
+            final_prompt
         )
         chain = prompt | model | StrOutputParser()
         response = chain.invoke({"messages": messages, "prev_chat_history_summary": prev_chat_history_summary})
+        # state['messages']={"role":'ai','content':response}
+        # print(state['messages'])
         state['messages']=AIMessage(content=response)
     return state
 
@@ -82,7 +75,7 @@ def summarize_conversation(state: State):
     return state
 
 def should_continue(state: State):
-    if len(state["messages"]) > 4:
+    if len(state["messages"]) > 30:
         return "summariser"
     return END
 
@@ -155,8 +148,3 @@ if __name__=="__main__":
     from pprint import pprint
     pprint(output)
 """
-    # API
-    # request/ input= thread_id, message, previous_chat_history
-    # output = AI message , summary
-
-    # Create a thread
